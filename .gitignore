@@ -1,0 +1,14 @@
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.lock.hcl
+*.tfvars
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+vendor/
+.DS_Store
+*.pem
+*.key
