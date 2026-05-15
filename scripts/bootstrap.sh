@@ -23,7 +23,9 @@ kubectl get nodes
 
 # ── Step 2: Install EBS CSI StorageClass ─────────────────────────────────────
 echo "==> [2/10] Creating gp3 StorageClass"
-kubectl apply -f k8s/base/storageclass.yaml
+EBS_KMS_KEY=$(cd infra/state/cluster && terraform output -raw ebs_kms_key_arn)
+sed "s|REPLACE_WITH_KMS_KEY_ARN|${EBS_KMS_KEY}|g" \
+  k8s/base/storageclass.yaml | kubectl apply -f -
 
 # ── Step 3: Install NGINX Ingress ─────────────────────────────────────────────
 echo "==> [3/10] Installing NGINX Ingress Controller"

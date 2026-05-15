@@ -54,6 +54,14 @@ module "ecr" {
   environment = "dev"
 }
 
+module "storage" {
+  source           = "../../modules/storage"
+  cluster_name     = module.eks.cluster_name
+  ebs_csi_role_arn = module.eks.ebs_csi_role_arn
+}
+
+output "ebs_kms_key_arn"        { value = module.storage.ebs_kms_key_arn }
+output "ebs_kms_key_id"         { value = module.storage.ebs_kms_key_id }
 output "cluster_name"           { value = module.eks.cluster_name }
 output "cluster_endpoint"       { value = module.eks.cluster_endpoint }
 output "cluster_oidc_issuer"    { value = module.eks.cluster_oidc_issuer }
