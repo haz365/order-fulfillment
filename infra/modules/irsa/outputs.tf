@@ -1,0 +1,9 @@
+output "external_dns_role_arn"         { value = aws_iam_role.external_dns.arn }
+output "cert_manager_role_arn"         { value = aws_iam_role.cert_manager.arn }
+output "order_service_role_arn"        { value = aws_iam_role.order_service.arn }
+output "payment_service_role_arn"      { value = aws_iam_role.payment_service.arn }
+output "shipping_service_role_arn"     { value = aws_iam_role.shipping_service.arn }
+output "worker_role_arn"               { value = aws_iam_role.worker.arn }
+output "notification_service_role_arn" { value = aws_iam_role.notification_service.arn }
+output "scheduler_role_arn"            { value = aws_iam_role.scheduler.arn }
+output "github_actions_role_arn"       { value = aws_iam_role.github_actions.arn }
