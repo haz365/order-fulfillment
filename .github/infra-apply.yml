@@ -1,0 +1,96 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-west-2
+
+jobs:
+  apply-network:
+    name: Apply Network
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::989346120260:role/order-fulfillment-dev-github-actions
+          aws-region: eu-west-2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
+      - name: Apply Network
+        working-directory: infra/state/network
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+  apply-cluster:
+    name: Apply Cluster
+    runs-on: ubuntu-latest
+    needs: apply-network
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::989346120260:role/order-fulfillment-dev-github-actions
+          aws-region: eu-west-2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
+      - name: Apply Cluster
+        working-directory: infra/state/cluster
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+  apply-addons:
+    name: Apply Addons
+    runs-on: ubuntu-latest
+    needs: apply-cluster
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::989346120260:role/order-fulfillment-dev-github-actions
+          aws-region: eu-west-2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
+      - name: Apply Addons
+        working-directory: infra/state/addons
+        run: |
+          terraform init
+          terraform apply -auto-approve

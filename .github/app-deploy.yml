@@ -1,0 +1,71 @@
+name: Deploy to EKS
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Images"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image SHA tag to deploy
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION:   eu-west-2
+  CLUSTER_NAME: order-fulfillment-dev
+
+jobs:
+  deploy:
+    name: Deploy via Helm
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::989346120260:role/order-fulfillment-dev-github-actions
+          aws-region: eu-west-2
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name $CLUSTER_NAME \
+            --region $AWS_REGION
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+
+      - name: Deploy
+        run: |
+          helm upgrade --install order-fulfillment \
+            k8s/charts/order-fulfillment \
+            -f k8s/charts/order-fulfillment/values.yaml \
+            -f k8s/charts/order-fulfillment/values-dev.yaml \
+            --namespace order-fulfillment \
+            --create-namespace \
+            --wait \
+            --timeout 10m \
+            --atomic
+
+      - name: Check rollout
+        run: |
+          for svc in api-gateway order-service inventory-service \
+                     payment-service shipping-service worker \
+                     scheduler dashboard-api; do
+            echo "Checking $svc..."
+            kubectl rollout status deployment/$svc \
+              -n order-fulfillment --timeout=5m
+          done
+
+      - name: Show pod status
+        run: kubectl get pods -n order-fulfillment
