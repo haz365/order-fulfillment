@@ -1,0 +1,172 @@
+global:
+  registry: ""
+  imageTag: latest
+  imagePullPolicy: IfNotPresent
+  dbHost: postgres
+  dbPort: "5432"
+  dbName: fulfillment
+  dbUser: appuser
+  dbSSLMode: require
+  awsRegion: eu-west-2
+
+sqsQueueUrl: ""
+
+services:
+  apiGateway:
+    replicas: 2
+    image: order-fulfillment/api-gateway
+    port: 8000
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPU: 70
+
+  orderService:
+    replicas: 2
+    image: order-fulfillment/order-service
+    port: 8001
+    irsaRoleArn: ""
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPU: 70
+
+  inventoryService:
+    replicas: 2
+    image: order-fulfillment/inventory-service
+    port: 8002
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      minReplicas: 2
+      maxReplicas: 8
+      targetCPU: 70
+
+  paymentService:
+    replicas: 2
+    image: order-fulfillment/payment-service
+    port: 8003
+    irsaRoleArn: ""
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPU: 60
+
+  notificationService:
+    replicas: 2
+    image: order-fulfillment/notification-service
+    port: 8004
+    irsaRoleArn: ""
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    hpa:
+      minReplicas: 2
+      maxReplicas: 6
+      targetCPU: 70
+
+  shippingService:
+    replicas: 2
+    image: order-fulfillment/shipping-service
+    port: 8005
+    irsaRoleArn: ""
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      minReplicas: 2
+      maxReplicas: 8
+      targetCPU: 70
+
+  worker:
+    replicas: 2
+    image: order-fulfillment/worker
+    port: 8006
+    irsaRoleArn: ""
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      minReplicas: 2
+      maxReplicas: 8
+      targetCPU: 70
+
+  scheduler:
+    replicas: 1
+    image: order-fulfillment/scheduler
+    port: 8007
+    irsaRoleArn: ""
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+  dashboardApi:
+    replicas: 2
+    image: order-fulfillment/dashboard-api
+    port: 8009
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      minReplicas: 2
+      maxReplicas: 6
+      targetCPU: 70
+
+postgres:
+  storage: 20Gi
+  storageClass: gp3
+
+redis:
+  storage: 10Gi
+  storageClass: gp3
+
+ingress:
+  host: orders.hasanali.uk
+  tls: true
+  clusterIssuer: letsencrypt-prod

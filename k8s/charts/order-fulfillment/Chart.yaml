@@ -1,0 +1,6 @@
+apiVersion: v2
+name: order-fulfillment
+description: Order Fulfillment Platform - nine services
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

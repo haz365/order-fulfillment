@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: order-fulfillment
+data:
+  DB_HOST:       {{ .Values.global.dbHost }}
+  DB_PORT:       {{ .Values.global.dbPort | quote }}
+  DB_NAME:       {{ .Values.global.dbName }}
+  DB_USER:       {{ .Values.global.dbUser }}
+  DB_SSL_MODE:   {{ .Values.global.dbSSLMode }}
+  AWS_REGION:    {{ .Values.global.awsRegion }}
+  SQS_QUEUE_URL: {{ .Values.sqsQueueUrl }}

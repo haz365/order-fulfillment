@@ -1,0 +1,26 @@
+global:
+  registry: 989346120260.dkr.ecr.eu-west-2.amazonaws.com
+  imageTag: latest
+  imagePullPolicy: Always
+  dbSSLMode: require
+
+sqsQueueUrl: ""
+
+services:
+  orderService:
+    irsaRoleArn: ""
+  paymentService:
+    irsaRoleArn: ""
+  shippingService:
+    irsaRoleArn: ""
+  worker:
+    irsaRoleArn: ""
+  notificationService:
+    irsaRoleArn: ""
+  scheduler:
+    irsaRoleArn: ""
+
+ingress:
+  host: orders.hasanali.uk
+  tls: true
+  clusterIssuer: letsencrypt-prod
