@@ -1,14 +1,78 @@
+# Terraform
 **/.terraform/
 *.tfstate
 *.tfstate.*
 *.tfplan
+tfplan
 .terraform.lock.hcl
 *.tfvars
+*.tfvars.json
+
+# Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
-node_modules/
+venv/
+dist/
+build/
+*.pyc
+
+# Go
 vendor/
+*.test
+
+# Node
+node_modules/
+.next/
+.env
+.env.local
+
+# Docker
+docker-compose.override.yml
+
+# Kubernetes secrets - never commit real secrets
+k8s/base/secrets.yaml
+k8s/**/secrets.yaml
+
+# Helm
+*.tgz
+charts/*/charts/
+
+# ArgoCD
+k8s/argocd/secrets/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+
+# OS
 .DS_Store
+Thumbs.db
+Thumbs.db:encryptable
+
+# CI artifacts
+sbom-*.json
+trivy-*.json
+cosign.key
+cosign.pub
+*.sig
+
+# Secrets
 *.pem
 *.key
+*.p12
+*.pfx
+.env*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Temp
+/tmp/
+task-*.json
