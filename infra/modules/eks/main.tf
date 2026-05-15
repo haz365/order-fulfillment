@@ -173,7 +173,7 @@ resource "aws_eks_node_group" "system" {
   node_group_name = "${local.cluster_name}-system"
   node_role_arn   = aws_iam_role.nodes.arn
   subnet_ids      = var.private_subnet_ids
-  instance_types  = ["t3.medium"]
+  instance_types  = ["t3a.medium", "t3.medium"]
 
   scaling_config {
     min_size     = var.node_min_size

@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler
+  namespace: order-fulfillment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scheduler
+  template:
+    metadata:
+      labels:
+        app: scheduler
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8007"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: scheduler
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: scheduler
+          image: REGISTRY/order-fulfillment/scheduler:SHA
+          ports:
+            - containerPort: 8007
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DB_PASSWORD
+            - name: PORT
+              value: "8007"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8007
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8007
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8007
+            failureThreshold: 30
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: scheduler
+  namespace: order-fulfillment
+  annotations:
+    eks.amazonaws.com/role-arn: REPLACE_WITH_SCHEDULER_ROLE_ARN
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scheduler
+  namespace: order-fulfillment
+spec:
+  selector:
+    app: scheduler
+  ports:
+    - port: 8007
+      targetPort: 8007
+  type: ClusterIP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: scheduler
+  namespace: order-fulfillment
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: scheduler

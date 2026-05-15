@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard-api
+  namespace: order-fulfillment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dashboard-api
+  template:
+    metadata:
+      labels:
+        app: dashboard-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8009"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: dashboard-api
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: dashboard-api
+          image: REGISTRY/order-fulfillment/dashboard-api:SHA
+          ports:
+            - containerPort: 8009
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DB_PASSWORD
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8009
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8009
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8009
+            failureThreshold: 30
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dashboard-api
+  namespace: order-fulfillment
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-api
+  namespace: order-fulfillment
+spec:
+  selector:
+    app: dashboard-api
+  ports:
+    - port: 8009
+      targetPort: 8009
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: dashboard-api
+  namespace: order-fulfillment
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: dashboard-api
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dashboard-api
+  namespace: order-fulfillment
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: dashboard-api

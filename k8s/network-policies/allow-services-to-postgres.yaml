@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-services-to-postgres
+  namespace: order-fulfillment
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: order-service
+        - podSelector:
+            matchLabels:
+              app: inventory-service
+        - podSelector:
+            matchLabels:
+              app: payment-service
+        - podSelector:
+            matchLabels:
+              app: notification-service
+        - podSelector:
+            matchLabels:
+              app: shipping-service
+        - podSelector:
+            matchLabels:
+              app: worker
+        - podSelector:
+            matchLabels:
+              app: scheduler
+        - podSelector:
+            matchLabels:
+              app: dashboard-api
+      ports:
+        - port: 5432
