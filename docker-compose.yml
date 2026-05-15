@@ -1,0 +1,276 @@
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_DB:       fulfillment
+      POSTGRES_USER:     appuser
+      POSTGRES_PASSWORD: devpassword
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d fulfillment"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["6379:6379"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  localstack:
+    image: localstack/localstack:3.4
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["4566:4566"]
+    environment:
+      SERVICES: sqs
+      DEFAULT_REGION: eu-west-2
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sqs-init:
+    image: amazon/aws-cli:latest
+    networks: [internal]
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID:     test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION:    eu-west-2
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        aws --endpoint-url=http://localstack:4566 sqs create-queue --queue-name orders-dlq
+        aws --endpoint-url=http://localstack:4566 sqs create-queue \
+          --queue-name orders \
+          --attributes '{"RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-west-2:000000000000:orders-dlq\",\"maxReceiveCount\":\"5\"}"}'
+        echo "queues ready"
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["8000:8000"]
+    environment:
+      API_KEY:                  dev-api-key
+      ORDER_SERVICE_URL:        http://order-service:8001
+      INVENTORY_SERVICE_URL:    http://inventory-service:8002
+      PAYMENT_SERVICE_URL:      http://payment-service:8003
+      NOTIFICATION_SERVICE_URL: http://notification-service:8004
+      SHIPPING_SERVICE_URL:     http://shipping-service:8005
+      DASHBOARD_SERVICE_URL:    http://dashboard-api:8009
+    depends_on:
+      - order-service
+      - inventory-service
+      - payment-service
+
+  order-service:
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["8001:8001"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST:               postgres
+      DB_PORT:               "5432"
+      DB_NAME:               fulfillment
+      DB_USER:               appuser
+      DB_PASSWORD:           devpassword
+      DB_SSL_MODE:           disable
+      SQS_QUEUE_URL:         http://sqs.eu-west-2.localhost.localstack.cloud:4566/000000000000/orders
+      AWS_ACCESS_KEY_ID:     test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION:            eu-west-2
+      AWS_ENDPOINT_URL:      http://localstack:4566
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: services/inventory-service/Dockerfile
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["8002:8002"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST:     postgres
+      DB_PORT:     "5432"
+      DB_NAME:     fulfillment
+      DB_USER:     appuser
+      DB_PASSWORD: devpassword
+      DB_SSL_MODE: disable
+      PORT:        "8002"
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: services/payment-service/Dockerfile
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["8003:8003"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST:               postgres
+      DB_PORT:               "5432"
+      DB_NAME:               fulfillment
+      DB_USER:               appuser
+      DB_PASSWORD:           devpassword
+      DB_SSL_MODE:           disable
+      SQS_QUEUE_URL:         http://sqs.eu-west-2.localhost.localstack.cloud:4566/000000000000/orders
+      AWS_ACCESS_KEY_ID:     test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION:            eu-west-2
+      AWS_ENDPOINT_URL:      http://localstack:4566
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["8004:8004"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      sqs-init:
+        condition: service_completed_successfully
+    environment:
+      DB_HOST:               postgres
+      DB_PORT:               "5432"
+      DB_NAME:               fulfillment
+      DB_USER:               appuser
+      DB_PASSWORD:           devpassword
+      DB_SSL_MODE:           disable
+      PORT:                  "8004"
+      SQS_QUEUE_URL:         http://sqs.eu-west-2.localhost.localstack.cloud:4566/000000000000/orders
+      AWS_ACCESS_KEY_ID:     test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION:            eu-west-2
+      AWS_ENDPOINT_URL:      http://localstack:4566
+
+  shipping-service:
+    build:
+      context: .
+      dockerfile: services/shipping-service/Dockerfile
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["8005:8005"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST:               postgres
+      DB_PORT:               "5432"
+      DB_NAME:               fulfillment
+      DB_USER:               appuser
+      DB_PASSWORD:           devpassword
+      DB_SSL_MODE:           disable
+      SQS_QUEUE_URL:         http://sqs.eu-west-2.localhost.localstack.cloud:4566/000000000000/orders
+      AWS_ACCESS_KEY_ID:     test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION:            eu-west-2
+      AWS_ENDPOINT_URL:      http://localstack:4566
+
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["8006:8006"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      sqs-init:
+        condition: service_completed_successfully
+    environment:
+      DB_HOST:               postgres
+      DB_PORT:               "5432"
+      DB_NAME:               fulfillment
+      DB_USER:               appuser
+      DB_PASSWORD:           devpassword
+      DB_SSL_MODE:           disable
+      PORT:                  "8006"
+      SQS_QUEUE_URL:         http://sqs.eu-west-2.localhost.localstack.cloud:4566/000000000000/orders
+      AWS_ACCESS_KEY_ID:     test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION:            eu-west-2
+      AWS_ENDPOINT_URL:      http://localstack:4566
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: services/scheduler/Dockerfile
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["8007:8007"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      sqs-init:
+        condition: service_completed_successfully
+    environment:
+      DB_HOST:               postgres
+      DB_PORT:               "5432"
+      DB_NAME:               fulfillment
+      DB_USER:               appuser
+      DB_PASSWORD:           devpassword
+      DB_SSL_MODE:           disable
+      PORT:                  "8007"
+      SQS_QUEUE_URL:         http://sqs.eu-west-2.localhost.localstack.cloud:4566/000000000000/orders
+      AWS_ACCESS_KEY_ID:     test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION:            eu-west-2
+      AWS_ENDPOINT_URL:      http://localstack:4566
+
+  dashboard-api:
+    build:
+      context: .
+      dockerfile: services/dashboard-api/Dockerfile
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["8009:8009"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST:     postgres
+      DB_PORT:     "5432"
+      DB_NAME:     fulfillment
+      DB_USER:     appuser
+      DB_PASSWORD: devpassword
+      DB_SSL_MODE: disable

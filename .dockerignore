@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+
+# Terraform
+infra/**/.terraform
+infra/**/*.tfstate
+infra/**/*.tfstate.*
+infra/**/*.tfplan
+infra/**/terraform.tfvars
+
+# Python
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+**/.venv
+**/venv
+**/dist
+**/build
+
+# Go
+**/vendor
+
+# Docker
+docker-compose.yml
+docker-compose.*.yml
+
+# K8s
+k8s/
+monitoring/
+
+# Docs
+docs/
+*.md
+
+# IDE
+.vscode/
+.idea/
+**/*.swp
+**/*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CI
+.github/
+
+# Secrets
+**/*.pem
+**/*.key
+**/.env
