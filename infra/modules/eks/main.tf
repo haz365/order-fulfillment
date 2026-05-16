@@ -173,22 +173,16 @@ resource "aws_eks_node_group" "system" {
   node_group_name = "${local.cluster_name}-system"
   node_role_arn   = aws_iam_role.nodes.arn
   subnet_ids      = var.private_subnet_ids
-  instance_types  = ["t3a.medium", "t3.medium"]
+  instance_types  = ["t3.small"]
 
   scaling_config {
-    min_size     = var.node_min_size
-    max_size     = var.node_max_size
-    desired_size = var.node_desired_size
+    min_size     = 3
+    max_size     = 8
+    desired_size = 4
   }
 
   update_config {
     max_unavailable = 1
-  }
-
-  taint {
-    key    = "CriticalAddonsOnly"
-    value  = "true"
-    effect = "NO_SCHEDULE"
   }
 
   labels = {

@@ -7,16 +7,13 @@ metadata:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
   project: order-fulfillment
-
   source:
     repoURL: https://github.com/haz365/order-fulfillment
     targetRevision: main
     path: k8s/karpenter
-
   destination:
     server: https://kubernetes.default.svc
     namespace: karpenter
-
   syncPolicy:
     automated:
       prune: true

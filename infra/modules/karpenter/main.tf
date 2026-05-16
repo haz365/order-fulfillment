@@ -10,8 +10,6 @@ terraform {
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
-# ── IAM role for Karpenter controller ────────────────────────────────────────
-
 resource "aws_iam_role" "karpenter_controller" {
   name = "${var.cluster_name}-karpenter-controller"
 
@@ -104,6 +102,15 @@ resource "aws_iam_policy" "karpenter_controller" {
         }
       },
       {
+        Sid    = "AllowEC2CreateTags"
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateTags",
+          "ec2:DeleteTags",
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "AllowRegionalReadActions"
         Effect = "Allow"
         Action = [
@@ -143,9 +150,9 @@ resource "aws_iam_policy" "karpenter_controller" {
         Resource = aws_sqs_queue.karpenter_interruption.arn
       },
       {
-        Sid    = "AllowPassingInstanceRole"
-        Effect = "Allow"
-        Action = ["iam:PassRole"]
+        Sid      = "AllowPassingInstanceRole"
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
         Resource = var.node_role_arn
         Condition = {
           StringEquals = {
@@ -212,41 +219,34 @@ resource "aws_iam_role_policy_attachment" "karpenter_controller" {
   policy_arn = aws_iam_policy.karpenter_controller.arn
 }
 
-# ── Karpenter interruption queue ──────────────────────────────────────────────
-
 resource "aws_sqs_queue" "karpenter_interruption" {
   name                      = "${var.cluster_name}-karpenter"
   message_retention_seconds = 300
   sqs_managed_sse_enabled   = true
-
-  tags = { Name = "${var.cluster_name}-karpenter" }
+  tags                      = { Name = "${var.cluster_name}-karpenter" }
 }
 
 resource "aws_sqs_queue_policy" "karpenter_interruption" {
   queue_url = aws_sqs_queue.karpenter_interruption.url
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect    = "Allow"
-        Principal = { Service = ["events.amazonaws.com", "sqs.amazonaws.com"] }
-        Action    = "sqs:SendMessage"
-        Resource  = aws_sqs_queue.karpenter_interruption.arn
-      }
-    ]
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = ["events.amazonaws.com", "sqs.amazonaws.com"] }
+      Action    = "sqs:SendMessage"
+      Resource  = aws_sqs_queue.karpenter_interruption.arn
+    }]
   })
 }
 
-# ── EventBridge rules for spot interruption ───────────────────────────────────
-
 resource "aws_cloudwatch_event_rule" "karpenter_interruption" {
-  for_each    = {
-    spot_interruption    = { source = ["aws.ec2"], type = "EC2 Spot Instance Interruption Warning" }
-    rebalance            = { source = ["aws.ec2"], type = "EC2 Instance Rebalance Recommendation" }
+  for_each = {
+    spot_interruption     = { source = ["aws.ec2"], type = "EC2 Spot Instance Interruption Warning" }
+    rebalance             = { source = ["aws.ec2"], type = "EC2 Instance Rebalance Recommendation" }
     instance_state_change = { source = ["aws.ec2"], type = "EC2 Instance State-change Notification" }
   }
 
-  name          = "${var.cluster_name}-karpenter-${each.key}"
+  name = "${var.cluster_name}-karpenter-${each.key}"
   event_pattern = jsonencode({
     source      = each.value.source
     detail-type = [each.value.type]
@@ -259,8 +259,6 @@ resource "aws_cloudwatch_event_target" "karpenter_interruption" {
   target_id = "KarpenterInterruptionQueue"
   arn       = aws_sqs_queue.karpenter_interruption.arn
 }
-
-# ── Instance profile for Karpenter nodes ─────────────────────────────────────
 
 resource "aws_iam_instance_profile" "karpenter" {
   name = "KarpenterNodeInstanceProfile-${var.cluster_name}"

@@ -23,29 +23,30 @@ provider "aws" {
 data "terraform_remote_state" "network" {
   backend = "s3"
   config = {
-    bucket = "order-fulfillment-tfstate-989346120260"
-    key    = "network/terraform.tfstate"
-    region = "eu-west-2"
+    bucket         = "order-fulfillment-tfstate-989346120260"
+    key            = "network/terraform.tfstate"
+    region         = "eu-west-2"
+    dynamodb_table = "order-fulfillment-tfstate-lock"
   }
 }
 
 data "terraform_remote_state" "cluster" {
   backend = "s3"
   config = {
-    bucket = "order-fulfillment-tfstate-989346120260"
-    key    = "cluster/terraform.tfstate"
-    region = "eu-west-2"
+    bucket         = "order-fulfillment-tfstate-989346120260"
+    key            = "cluster/terraform.tfstate"
+    region         = "eu-west-2"
+    dynamodb_table = "order-fulfillment-tfstate-lock"
   }
 }
 
-# ── SQS queue ─────────────────────────────────────────────────────────────────
+# ── SQS queues ────────────────────────────────────────────────────────────────
 
 resource "aws_sqs_queue" "orders_dlq" {
   name                      = "order-fulfillment-dev-orders-dlq"
   message_retention_seconds = 1209600
   sqs_managed_sse_enabled   = true
-
-  tags = { Name = "order-fulfillment-dev-orders-dlq" }
+  tags                      = { Name = "order-fulfillment-dev-orders-dlq" }
 }
 
 resource "aws_sqs_queue" "orders" {
@@ -61,6 +62,8 @@ resource "aws_sqs_queue" "orders" {
 
   tags = { Name = "order-fulfillment-dev-orders" }
 }
+
+# ── CloudWatch alarms ─────────────────────────────────────────────────────────
 
 resource "aws_cloudwatch_metric_alarm" "dlq_depth" {
   alarm_name          = "order-fulfillment-dev-dlq-depth"
@@ -96,26 +99,32 @@ resource "aws_cloudwatch_metric_alarm" "dlq_age" {
   }
 }
 
+# ── Karpenter ─────────────────────────────────────────────────────────────────
+
 module "karpenter" {
-  source           = "../../modules/karpenter"
-  project          = "order-fulfillment"
-  environment      = "dev"
-  cluster_name     = data.terraform_remote_state.cluster.outputs.cluster_name
+  source            = "../../modules/karpenter"
+  project           = "order-fulfillment"
+  environment       = "dev"
+  cluster_name      = data.terraform_remote_state.cluster.outputs.cluster_name
   oidc_provider_arn = data.terraform_remote_state.cluster.outputs.oidc_provider_arn
   oidc_issuer_host  = data.terraform_remote_state.cluster.outputs.oidc_issuer_host
   node_role_arn     = data.terraform_remote_state.cluster.outputs.node_role_arn
 }
 
+# ── IRSA ──────────────────────────────────────────────────────────────────────
+
 module "irsa" {
-  source           = "../../modules/irsa"
-  project          = "order-fulfillment"
-  environment      = "dev"
-  cluster_name     = data.terraform_remote_state.cluster.outputs.cluster_name
+  source            = "../../modules/irsa"
+  project           = "order-fulfillment"
+  environment       = "dev"
+  cluster_name      = data.terraform_remote_state.cluster.outputs.cluster_name
   oidc_provider_arn = data.terraform_remote_state.cluster.outputs.oidc_provider_arn
   oidc_issuer_host  = data.terraform_remote_state.cluster.outputs.oidc_issuer_host
-  sqs_queue_arn    = aws_sqs_queue.orders.arn
-  sqs_queue_url    = aws_sqs_queue.orders.url
+  sqs_queue_arn     = aws_sqs_queue.orders.arn
+  sqs_queue_url     = aws_sqs_queue.orders.url
 }
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
 
 output "sqs_queue_url"              { value = aws_sqs_queue.orders.url }
 output "sqs_queue_arn"              { value = aws_sqs_queue.orders.arn }

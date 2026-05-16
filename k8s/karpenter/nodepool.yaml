@@ -21,13 +21,13 @@ spec:
           values: ["linux"]
         - key: karpenter.sh/capacity-type
           operator: In
-          values: ["on-demand", "spot"]
+          values: ["spot", "on-demand"]
         - key: karpenter.k8s.aws/instance-family
           operator: In
-          values: ["t3", "t3a", "m5", "c5"]
+          values: ["t3"]
         - key: karpenter.k8s.aws/instance-size
           operator: In
-          values: ["medium", "large", "xlarge"]
+          values: ["small", "medium"]
       expireAfter: 720h
   limits:
     cpu: 100
