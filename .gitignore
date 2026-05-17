@@ -75,4 +75,4 @@ logs/
 
 # Temp
 /tmp/
-task-*.json
+task-*.json.env
