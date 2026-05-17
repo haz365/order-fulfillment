@@ -1,0 +1,141 @@
+{
+  "title": "Order Fulfillment Platform",
+  "uid": "order-fulfillment",
+  "timezone": "browser",
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Orders Created (rate)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(orders_created_total[5m]))",
+          "legendFormat": "orders/s"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Payments Processed",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 0, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(payments_processed_total[5m])) by (status)",
+          "legendFormat": "{{ status }}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "API Gateway Request Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_requests_total[5m])) by (status)",
+          "legendFormat": "{{ status }}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "API Gateway Latency p95",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(gateway_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Worker Messages Processed",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 8, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(worker_messages_processed_total[5m])) by (event_type)",
+          "legendFormat": "{{ event_type }}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Worker Messages Failed",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 8, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(worker_messages_failed_total[5m])) by (event_type)",
+          "legendFormat": "{{ event_type }}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Shipments Created",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 16, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(shipments_created_total[5m]))",
+          "legendFormat": "shipments/s"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Inventory Low Stock Items",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 16, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "inventory_low_stock_items",
+          "legendFormat": "low stock"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Scheduler Jobs Run",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 16, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(scheduler_jobs_run_total[5m])) by (job)",
+          "legendFormat": "{{ job }}"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Pod CPU Usage",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace='order-fulfillment'}[5m])) by (pod)",
+          "legendFormat": "{{ pod }}"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Pod Memory Usage",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(container_memory_working_set_bytes{namespace='order-fulfillment'}) by (pod) / 1024 / 1024",
+          "legendFormat": "{{ pod }} MB"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 38
+}
