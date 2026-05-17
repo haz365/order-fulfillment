@@ -21,8 +21,8 @@ echo "==> [1/11] Connecting to EKS cluster"
 aws eks update-kubeconfig --name $CLUSTER --region $REGION
 kubectl get nodes
 
-# ── Get all IRSA roles upfront ────────────────────────────────────────────────
-echo "==> Getting IRSA role ARNs"
+# ── Get all outputs upfront ───────────────────────────────────────────────────
+echo "==> Getting outputs from Terraform"
 IRSA=$(cd infra/state/addons && terraform output -json irsa)
 EXTERNAL_DNS_ROLE=$(echo $IRSA | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['external_dns_role_arn'])")
 CERT_MANAGER_ROLE=$(echo $IRSA | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['cert_manager_role_arn'])")
@@ -38,20 +38,15 @@ KARPENTER_ROLE=$(cd infra/state/addons && terraform output -raw karpenter_contro
 KARPENTER_QUEUE=$(cd infra/state/addons && terraform output -raw karpenter_queue_name)
 NODE_ROLE=$(cd infra/state/cluster && terraform output -raw node_role_arn | cut -d'/' -f2)
 
-echo "==> IRSA roles loaded"
-echo "    ExternalDNS: $EXTERNAL_DNS_ROLE"
-echo "    CertManager: $CERT_MANAGER_ROLE"
-echo "    SQS URL:     $SQS_URL"
+echo "==> All outputs loaded"
 
-# ── Step 2: Install snapshot CRDs ────────────────────────────────────────────
+# ── Step 2: Install snapshot CRDs ─────────────────────────────────────────────
 echo "==> [2/11] Installing snapshot controller CRDs"
 kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
 kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
 kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
 kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml
 kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
-
-echo "==> Waiting for snapshot controller..."
 sleep 15
 
 # ── Step 3: Create StorageClass ───────────────────────────────────────────────
@@ -84,9 +79,10 @@ helm upgrade --install cert-manager jetstack/cert-manager \
   --create-namespace \
   --set crds.enabled=true \
   --set startupapicheck.enabled=false \
+  --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${CERT_MANAGER_ROLE}" \
   --wait --timeout 10m
 
-# ── Step 6: Create ClusterIssuer ─────────────────────────────────────────────
+# ── Step 6: Create ClusterIssuer ──────────────────────────────────────────────
 echo "==> [6/11] Creating Let's Encrypt ClusterIssuer"
 kubectl apply -f - <<EOF
 apiVersion: cert-manager.io/v1
@@ -126,6 +122,11 @@ helm upgrade --install external-dns external-dns/external-dns \
 
 # ── Step 8: Install Karpenter ─────────────────────────────────────────────────
 echo "==> [8/11] Installing Karpenter"
+
+echo "==> Creating EC2 Spot service-linked role"
+aws iam create-service-linked-role \
+  --aws-service-name spot.amazonaws.com 2>/dev/null || true
+
 KARPENTER_VERSION="1.0.0"
 helm upgrade --install karpenter oci://public.ecr.aws/karpenter/karpenter \
   --version ${KARPENTER_VERSION} \
@@ -147,14 +148,10 @@ kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -n argocd \
   -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml 2>/dev/null || true
 
-echo "==> Waiting for ArgoCD to be ready..."
-sleep 30
+echo "==> Waiting for ArgoCD..."
+sleep 60
 kubectl wait --for=condition=available deployment/argocd-server \
   -n argocd --timeout=180s || true
-kubectl wait --for=condition=available deployment/argocd-repo-server \
-  -n argocd --timeout=180s || true
-
-echo "==> ArgoCD ready"
 
 # ── Step 10: Install Prometheus stack ─────────────────────────────────────────
 echo "==> [10/11] Installing kube-prometheus-stack"
@@ -185,19 +182,13 @@ for svc in api-gateway order-service inventory-service payment-service \
   echo "==> Pushed ${svc}:${SHA}"
 done
 
-# Update values with SHA
-# macOS compatible sed
-sed -i '' "s/imageTag:.*/imageTag: ${SHA}/" \
-  k8s/charts/order-fulfillment/values-dev.yaml 2>/dev/null || \
-sed -i "s/imageTag:.*/imageTag: ${SHA}/" \
-  k8s/charts/order-fulfillment/values-dev.yaml
-
 # Deploy via Helm
 echo "==> Deploying application via Helm"
 helm upgrade --install order-fulfillment \
   k8s/charts/order-fulfillment \
   -f k8s/charts/order-fulfillment/values.yaml \
   -f k8s/charts/order-fulfillment/values-dev.yaml \
+  --set global.imageTag="${SHA}" \
   --set sqsQueueUrl="${SQS_URL}" \
   --set services.orderService.irsaRoleArn="${ORDER_ROLE}" \
   --set services.paymentService.irsaRoleArn="${PAYMENT_ROLE}" \
@@ -227,7 +218,8 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath="{.data.password}" | base64 -d
 echo ""
 echo ""
-echo "App URL:    https://${DOMAIN}"
-echo "ArgoCD URL: https://argocd.${DOMAIN}"
+echo "App URL:     https://${DOMAIN}"
+echo "Grafana URL: https://${DOMAIN}/grafana"
+echo "ArgoCD URL:  https://argocd.${DOMAIN}"
 echo ""
 kubectl get pods -n order-fulfillment

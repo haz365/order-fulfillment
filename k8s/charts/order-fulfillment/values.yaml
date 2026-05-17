@@ -6,10 +6,12 @@ global:
   dbPort: "5432"
   dbName: fulfillment
   dbUser: appuser
-  dbSSLMode: require
+  dbSSLMode: disable
   awsRegion: eu-west-2
 
 sqsQueueUrl: ""
+dbPassword: "devpassword"
+apiKey: "dev-api-key"
 
 services:
   apiGateway:
