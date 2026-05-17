@@ -274,3 +274,11 @@ services:
       DB_USER:     appuser
       DB_PASSWORD: devpassword
       DB_SSL_MODE: disable
+
+  dashboard-ui:
+    build:
+      context: .
+      dockerfile: services/dashboard-ui/Dockerfile
+    restart: unless-stopped
+    networks: [internal]
+    ports: ["3000:80"]

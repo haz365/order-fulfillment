@@ -10,8 +10,8 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -87,6 +87,16 @@ async def observe(request: Request, call_next):
     REQUEST_LATENCY.labels(request.method, request.url.path).observe(latency)
     return response
 
+# ── Frontend ──────────────────────────────────────────────────────────────────
+
+@app.get("/", response_class=HTMLResponse)
+def frontend():
+    try:
+        with open("/app/static/index.html") as f:
+            return f.read()
+    except FileNotFoundError:
+        return HTMLResponse("<h1>Dashboard UI not found</h1>", status_code=404)
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -112,7 +122,6 @@ def summary():
     conn = get_db()
     cur  = conn.cursor()
     try:
-        # Orders summary
         cur.execute("""
             SELECT
                 COUNT(*) as total_orders,
@@ -128,7 +137,6 @@ def summary():
         """)
         orders = dict(cur.fetchone())
 
-        # Today's orders
         cur.execute("""
             SELECT COUNT(*) as today_orders,
                    COALESCE(SUM(total_amount), 0) as today_revenue
@@ -137,7 +145,6 @@ def summary():
         """)
         today = dict(cur.fetchone())
 
-        # Payments summary
         cur.execute("""
             SELECT
                 COUNT(*) as total_payments,

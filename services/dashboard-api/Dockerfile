@@ -9,6 +9,7 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY --chown=appuser:appuser services/dashboard-api/main.py .
+COPY --chown=appuser:appuser services/dashboard-api/static/ ./static/
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8009
 USER appuser
