@@ -10,8 +10,8 @@ global:
   awsRegion: eu-west-2
 
 sqsQueueUrl: ""
-dbPassword: "devpassword"
-apiKey: "dev-api-key"
+dbPassword: ""
+apiKey: ""
 
 services:
   apiGateway:

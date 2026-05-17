@@ -10,6 +10,11 @@ DOMAIN="orders.hasanali.uk"
 EMAIL="hasan_ali75@outlook.com"
 HOSTED_ZONE_ID="Z044516511F47YV4NV151"
 
+# ── Required secrets ──────────────────────────────────────────────────────────
+: "${DB_PASSWORD:?DB_PASSWORD must be set. Export it before running: export DB_PASSWORD=yourpassword}"
+: "${API_KEY:?API_KEY must be set. Export it before running: export API_KEY=yourapikey}"
+: "${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set. Export it before running: export GRAFANA_PASSWORD=yourpassword}"
+
 echo ""
 echo "╔══════════════════════════════════════════════╗"
 echo "║   Order Fulfillment Platform Bootstrap       ║"

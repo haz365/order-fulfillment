@@ -1,6 +1,6 @@
 grafana:
   enabled: true
-  adminPassword: grafana123!
+  adminPassword: ""
 
   ingress:
     enabled: true
