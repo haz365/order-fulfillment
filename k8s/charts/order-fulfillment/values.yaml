@@ -13,7 +13,7 @@ sqsQueueUrl: ""
 
 services:
   apiGateway:
-    replicas: 2
+    replicas: 1
     image: order-fulfillment/api-gateway
     port: 8000
     resources:
@@ -24,12 +24,12 @@ services:
         cpu: 500m
         memory: 512Mi
     hpa:
-      minReplicas: 2
-      maxReplicas: 10
+      minReplicas: 1
+      maxReplicas: 5
       targetCPU: 70
 
   orderService:
-    replicas: 2
+    replicas: 1
     image: order-fulfillment/order-service
     port: 8001
     irsaRoleArn: ""
@@ -41,12 +41,12 @@ services:
         cpu: 500m
         memory: 512Mi
     hpa:
-      minReplicas: 2
-      maxReplicas: 10
+      minReplicas: 1
+      maxReplicas: 5
       targetCPU: 70
 
   inventoryService:
-    replicas: 2
+    replicas: 1
     image: order-fulfillment/inventory-service
     port: 8002
     resources:
@@ -57,12 +57,12 @@ services:
         cpu: 500m
         memory: 512Mi
     hpa:
-      minReplicas: 2
-      maxReplicas: 8
+      minReplicas: 1
+      maxReplicas: 4
       targetCPU: 70
 
   paymentService:
-    replicas: 2
+    replicas: 1
     image: order-fulfillment/payment-service
     port: 8003
     irsaRoleArn: ""
@@ -74,12 +74,12 @@ services:
         cpu: 500m
         memory: 512Mi
     hpa:
-      minReplicas: 2
-      maxReplicas: 10
+      minReplicas: 1
+      maxReplicas: 5
       targetCPU: 60
 
   notificationService:
-    replicas: 2
+    replicas: 1
     image: order-fulfillment/notification-service
     port: 8004
     irsaRoleArn: ""
@@ -91,12 +91,12 @@ services:
         cpu: 250m
         memory: 256Mi
     hpa:
-      minReplicas: 2
-      maxReplicas: 6
+      minReplicas: 1
+      maxReplicas: 3
       targetCPU: 70
 
   shippingService:
-    replicas: 2
+    replicas: 1
     image: order-fulfillment/shipping-service
     port: 8005
     irsaRoleArn: ""
@@ -108,12 +108,12 @@ services:
         cpu: 500m
         memory: 512Mi
     hpa:
-      minReplicas: 2
-      maxReplicas: 8
+      minReplicas: 1
+      maxReplicas: 4
       targetCPU: 70
 
   worker:
-    replicas: 2
+    replicas: 1
     image: order-fulfillment/worker
     port: 8006
     irsaRoleArn: ""
@@ -125,8 +125,8 @@ services:
         cpu: 500m
         memory: 512Mi
     hpa:
-      minReplicas: 2
-      maxReplicas: 8
+      minReplicas: 1
+      maxReplicas: 4
       targetCPU: 70
 
   scheduler:
@@ -143,7 +143,7 @@ services:
         memory: 256Mi
 
   dashboardApi:
-    replicas: 2
+    replicas: 1
     image: order-fulfillment/dashboard-api
     port: 8009
     resources:
@@ -154,8 +154,8 @@ services:
         cpu: 500m
         memory: 512Mi
     hpa:
-      minReplicas: 2
-      maxReplicas: 6
+      minReplicas: 1
+      maxReplicas: 3
       targetCPU: 70
 
 postgres:

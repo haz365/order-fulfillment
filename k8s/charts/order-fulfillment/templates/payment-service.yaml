@@ -1,38 +1,32 @@
-{{- $root := . -}}
-{{- range $name, $svc := .Values.services -}}
-{{- if ne $name "apiGateway" -}}
-{{- $appName := $name | replace "Service" "-service" | replace "Api" "-api" | lower | trimPrefix "-" -}}
-{{- $appName = regexReplaceAll "([A-Z])" $appName "-${1}" | lower | trimPrefix "-" -}}
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $appName }}
+  name: payment-service
   namespace: order-fulfillment
 spec:
-  replicas: {{ $svc.replicas }}
+  replicas: {{ .Values.services.paymentService.replicas }}
   selector:
     matchLabels:
-      app: {{ $appName }}
+      app: payment-service
   template:
     metadata:
       labels:
-        app: {{ $appName }}
+        app: payment-service
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: {{ $svc.port | quote }}
+        prometheus.io/port: {{ .Values.services.paymentService.port | quote }}
         prometheus.io/path: "/metrics"
     spec:
-      serviceAccountName: {{ $appName }}
+      serviceAccountName: payment-service
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
       containers:
-        - name: {{ $appName }}
-          image: {{ $root.Values.global.registry }}/{{ $svc.image }}:{{ $root.Values.global.imageTag }}
-          imagePullPolicy: {{ $root.Values.global.imagePullPolicy }}
+        - name: payment-service
+          image: {{ .Values.global.registry }}/{{ .Values.services.paymentService.image }}:{{ .Values.global.imageTag }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
-            - containerPort: {{ $svc.port }}
+            - containerPort: {{ .Values.services.paymentService.port }}
           envFrom:
             - configMapRef:
                 name: app-config
@@ -42,26 +36,24 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: DB_PASSWORD
-            - name: PORT
-              value: {{ $svc.port | quote }}
           resources:
-            {{- toYaml $svc.resources | nindent 12 }}
+            {{- toYaml .Values.services.paymentService.resources | nindent 12 }}
           readinessProbe:
             httpGet:
               path: /health
-              port: {{ $svc.port }}
+              port: {{ .Values.services.paymentService.port }}
             initialDelaySeconds: 10
             periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /health
-              port: {{ $svc.port }}
+              port: {{ .Values.services.paymentService.port }}
             initialDelaySeconds: 30
             periodSeconds: 10
           startupProbe:
             httpGet:
               path: /health
-              port: {{ $svc.port }}
+              port: {{ .Values.services.paymentService.port }}
             failureThreshold: 30
             periodSeconds: 5
           securityContext:
@@ -73,57 +65,53 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ $appName }}
+  name: payment-service
   namespace: order-fulfillment
-  {{- if $svc.irsaRoleArn }}
+  {{- if .Values.services.paymentService.irsaRoleArn }}
   annotations:
-    eks.amazonaws.com/role-arn: {{ $svc.irsaRoleArn }}
+    eks.amazonaws.com/role-arn: {{ .Values.services.paymentService.irsaRoleArn }}
   {{- end }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $appName }}
+  name: payment-service
   namespace: order-fulfillment
 spec:
   selector:
-    app: {{ $appName }}
+    app: payment-service
   ports:
-    - port: {{ $svc.port }}
-      targetPort: {{ $svc.port }}
+    - port: {{ .Values.services.paymentService.port }}
+      targetPort: {{ .Values.services.paymentService.port }}
   type: ClusterIP
-{{- if $svc.hpa }}
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ $appName }}
+  name: payment-service
   namespace: order-fulfillment
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ $appName }}
-  minReplicas: {{ $svc.hpa.minReplicas }}
-  maxReplicas: {{ $svc.hpa.maxReplicas }}
+    name: payment-service
+  minReplicas: {{ .Values.services.paymentService.hpa.minReplicas }}
+  maxReplicas: {{ .Values.services.paymentService.hpa.maxReplicas }}
   metrics:
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: {{ $svc.hpa.targetCPU }}
-{{- end }}
+          averageUtilization: {{ .Values.services.paymentService.hpa.targetCPU }}
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ $appName }}
+  name: payment-service
   namespace: order-fulfillment
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app: {{ $appName }}
-{{- end }}
-{{- end }}
+      app: payment-service

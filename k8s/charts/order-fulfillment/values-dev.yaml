@@ -1,6 +1,6 @@
 global:
   registry: 989346120260.dkr.ecr.eu-west-2.amazonaws.com
-  imageTag: latest
+  imageTag: 2ec686d
   imagePullPolicy: Always
   dbSSLMode: require
 

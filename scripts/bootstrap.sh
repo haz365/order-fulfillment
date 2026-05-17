@@ -145,11 +145,16 @@ sed "s/REPLACE_WITH_NODE_ROLE_NAME/${NODE_ROLE}/g; \
 echo "==> [9/11] Installing ArgoCD"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -n argocd \
-  -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml 2>/dev/null || true
 
-echo "==> Waiting for ArgoCD..."
+echo "==> Waiting for ArgoCD to be ready..."
+sleep 30
 kubectl wait --for=condition=available deployment/argocd-server \
-  -n argocd --timeout=180s
+  -n argocd --timeout=180s || true
+kubectl wait --for=condition=available deployment/argocd-repo-server \
+  -n argocd --timeout=180s || true
+
+echo "==> ArgoCD ready"
 
 # ── Step 10: Install Prometheus stack ─────────────────────────────────────────
 echo "==> [10/11] Installing kube-prometheus-stack"
@@ -181,6 +186,9 @@ for svc in api-gateway order-service inventory-service payment-service \
 done
 
 # Update values with SHA
+# macOS compatible sed
+sed -i '' "s/imageTag:.*/imageTag: ${SHA}/" \
+  k8s/charts/order-fulfillment/values-dev.yaml 2>/dev/null || \
 sed -i "s/imageTag:.*/imageTag: ${SHA}/" \
   k8s/charts/order-fulfillment/values-dev.yaml
 

@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler
+  namespace: order-fulfillment
+spec:
+  replicas: {{ .Values.services.scheduler.replicas }}
+  selector:
+    matchLabels:
+      app: scheduler
+  template:
+    metadata:
+      labels:
+        app: scheduler
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.services.scheduler.port | quote }}
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: scheduler
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: scheduler
+          image: {{ .Values.global.registry }}/{{ .Values.services.scheduler.image }}:{{ .Values.global.imageTag }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.scheduler.port }}
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DB_PASSWORD
+            - name: PORT
+              value: {{ .Values.services.scheduler.port | quote }}
+          resources:
+            {{- toYaml .Values.services.scheduler.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.scheduler.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.scheduler.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.services.scheduler.port }}
+            failureThreshold: 30
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: scheduler
+  namespace: order-fulfillment
+  {{- if .Values.services.scheduler.irsaRoleArn }}
+  annotations:
+    eks.amazonaws.com/role-arn: {{ .Values.services.scheduler.irsaRoleArn }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scheduler
+  namespace: order-fulfillment
+spec:
+  selector:
+    app: scheduler
+  ports:
+    - port: {{ .Values.services.scheduler.port }}
+      targetPort: {{ .Values.services.scheduler.port }}
+  type: ClusterIP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: scheduler
+  namespace: order-fulfillment
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: scheduler
