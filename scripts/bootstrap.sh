@@ -1,6 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+# ── Required environment variables ───────────────────────────────────────────
+: "${DB_PASSWORD:?DB_PASSWORD must be set}"
+: "${API_KEY:?API_KEY must be set}"
+: "${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}"
+
 CLUSTER="order-fulfillment-dev"
 REGION="eu-west-2"
 ACCOUNT="989346120260"
@@ -10,11 +15,6 @@ DOMAIN="orders.hasanali.uk"
 EMAIL="hasan_ali75@outlook.com"
 HOSTED_ZONE_ID="Z044516511F47YV4NV151"
 
-# ── Required secrets ──────────────────────────────────────────────────────────
-: "${DB_PASSWORD:?DB_PASSWORD must be set. Export it before running: export DB_PASSWORD=yourpassword}"
-: "${API_KEY:?API_KEY must be set. Export it before running: export API_KEY=yourapikey}"
-: "${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set. Export it before running: export GRAFANA_PASSWORD=yourpassword}"
-
 echo ""
 echo "╔══════════════════════════════════════════════╗"
 echo "║   Order Fulfillment Platform Bootstrap       ║"
@@ -22,7 +22,7 @@ echo "╚═══════════════════════�
 echo ""
 
 # ── Step 1: Connect to cluster ────────────────────────────────────────────────
-echo "==> [1/11] Connecting to EKS cluster"
+echo "==> [1/13] Connecting to EKS cluster"
 aws eks update-kubeconfig --name $CLUSTER --region $REGION
 kubectl get nodes
 
@@ -37,6 +37,7 @@ SHIPPING_ROLE=$(echo $IRSA     | python3 -c "import sys,json; d=json.load(sys.st
 WORKER_ROLE=$(echo $IRSA       | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['worker_role_arn'])")
 NOTIF_ROLE=$(echo $IRSA        | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['notification_service_role_arn'])")
 SCHEDULER_ROLE=$(echo $IRSA    | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['scheduler_role_arn'])")
+ESO_ROLE=$(cd infra/state/addons && terraform output -raw eso_role_arn)
 SQS_URL=$(cd infra/state/addons && terraform output -raw sqs_queue_url)
 EBS_KMS_KEY=$(cd infra/state/cluster && terraform output -raw ebs_kms_key_arn)
 KARPENTER_ROLE=$(cd infra/state/addons && terraform output -raw karpenter_controller_role)
@@ -45,8 +46,30 @@ NODE_ROLE=$(cd infra/state/cluster && terraform output -raw node_role_arn | cut 
 
 echo "==> All outputs loaded"
 
-# ── Step 2: Install snapshot CRDs ─────────────────────────────────────────────
-echo "==> [2/11] Installing snapshot controller CRDs"
+# ── Step 2: Create secrets in AWS Secrets Manager ─────────────────────────────
+echo "==> [2/13] Creating secrets in AWS Secrets Manager"
+aws secretsmanager create-secret \
+  --name /order-fulfillment/dev/db-password \
+  --secret-string "{\"password\":\"${DB_PASSWORD}\"}" \
+  --region $REGION 2>/dev/null || \
+aws secretsmanager update-secret \
+  --secret-id /order-fulfillment/dev/db-password \
+  --secret-string "{\"password\":\"${DB_PASSWORD}\"}" \
+  --region $REGION
+
+aws secretsmanager create-secret \
+  --name /order-fulfillment/dev/api-key \
+  --secret-string "{\"key\":\"${API_KEY}\"}" \
+  --region $REGION 2>/dev/null || \
+aws secretsmanager update-secret \
+  --secret-id /order-fulfillment/dev/api-key \
+  --secret-string "{\"key\":\"${API_KEY}\"}" \
+  --region $REGION
+
+echo "==> Secrets created in Secrets Manager"
+
+# ── Step 3: Install snapshot CRDs ─────────────────────────────────────────────
+echo "==> [3/13] Installing snapshot controller CRDs"
 kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
 kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
 kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
@@ -54,13 +77,13 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snaps
 kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml
 sleep 15
 
-# ── Step 3: Create StorageClass ───────────────────────────────────────────────
-echo "==> [3/11] Creating gp3 StorageClass"
+# ── Step 4: Create StorageClass ───────────────────────────────────────────────
+echo "==> [4/13] Creating gp3 StorageClass"
 sed "s|REPLACE_WITH_KMS_KEY_ARN|${EBS_KMS_KEY}|g" \
   k8s/base/storageclass.yaml | kubectl apply -f -
 
-# ── Step 4: Install NGINX Ingress ─────────────────────────────────────────────
-echo "==> [4/11] Installing NGINX Ingress Controller"
+# ── Step 5: Install NGINX Ingress ─────────────────────────────────────────────
+echo "==> [5/13] Installing NGINX Ingress Controller"
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
@@ -75,8 +98,8 @@ kubectl get svc -n ingress-nginx ingress-nginx-controller \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 echo ""
 
-# ── Step 5: Install CertManager ───────────────────────────────────────────────
-echo "==> [5/11] Installing CertManager"
+# ── Step 6: Install CertManager ───────────────────────────────────────────────
+echo "==> [6/13] Installing CertManager"
 helm repo add jetstack https://charts.jetstack.io
 helm repo update
 helm upgrade --install cert-manager jetstack/cert-manager \
@@ -87,8 +110,8 @@ helm upgrade --install cert-manager jetstack/cert-manager \
   --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${CERT_MANAGER_ROLE}" \
   --wait --timeout 10m
 
-# ── Step 6: Create ClusterIssuer ──────────────────────────────────────────────
-echo "==> [6/11] Creating Let's Encrypt ClusterIssuer"
+# ── Step 7: Create ClusterIssuer ──────────────────────────────────────────────
+echo "==> [7/13] Creating Let's Encrypt ClusterIssuer"
 kubectl apply -f - <<EOF
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -109,8 +132,8 @@ EOF
 
 kubectl get clusterissuer letsencrypt-prod
 
-# ── Step 7: Install ExternalDNS ───────────────────────────────────────────────
-echo "==> [7/11] Installing ExternalDNS"
+# ── Step 8: Install ExternalDNS ───────────────────────────────────────────────
+echo "==> [8/13] Installing ExternalDNS"
 helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
 helm repo update
 helm upgrade --install external-dns external-dns/external-dns \
@@ -125,9 +148,21 @@ helm upgrade --install external-dns external-dns/external-dns \
   --set interval=1m \
   --wait --timeout 5m
 
-# ── Step 8: Install Karpenter ─────────────────────────────────────────────────
-echo "==> [8/11] Installing Karpenter"
+# ── Step 9: Install External Secrets Operator ─────────────────────────────────
+echo "==> [9/13] Installing External Secrets Operator"
+helm repo add external-secrets https://charts.external-secrets.io
+helm repo update
+helm upgrade --install external-secrets external-secrets/external-secrets \
+  --namespace external-secrets \
+  --create-namespace \
+  --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="${ESO_ROLE}" \
+  --wait --timeout 5m
 
+echo "==> Applying ClusterSecretStore and ExternalSecrets"
+kubectl apply -f k8s/base/external-secrets/
+
+# ── Step 10: Install Karpenter ────────────────────────────────────────────────
+echo "==> [10/13] Installing Karpenter"
 echo "==> Creating EC2 Spot service-linked role"
 aws iam create-service-linked-role \
   --aws-service-name spot.amazonaws.com 2>/dev/null || true
@@ -147,8 +182,8 @@ sed "s/REPLACE_WITH_NODE_ROLE_NAME/${NODE_ROLE}/g; \
      s/REPLACE_WITH_CLUSTER_NAME/${CLUSTER}/g" \
   k8s/karpenter/nodepool.yaml | kubectl apply -f -
 
-# ── Step 9: Install ArgoCD ────────────────────────────────────────────────────
-echo "==> [9/11] Installing ArgoCD"
+# ── Step 11: Install ArgoCD ───────────────────────────────────────────────────
+echo "==> [11/13] Installing ArgoCD"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -n argocd \
   -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml 2>/dev/null || true
@@ -158,18 +193,19 @@ sleep 60
 kubectl wait --for=condition=available deployment/argocd-server \
   -n argocd --timeout=180s || true
 
-# ── Step 10: Install Prometheus stack ─────────────────────────────────────────
-echo "==> [10/11] Installing kube-prometheus-stack"
+# ── Step 12: Install Prometheus stack ─────────────────────────────────────────
+echo "==> [12/13] Installing kube-prometheus-stack"
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
   --namespace monitoring \
   --create-namespace \
   -f monitoring/values-prometheus.yaml \
+  --set grafana.adminPassword="${GRAFANA_PASSWORD}" \
   --wait --timeout 15m
 
-# ── Step 11: Build and deploy app ─────────────────────────────────────────────
-echo "==> [11/11] Building and pushing images"
+# ── Step 13: Build and deploy app ─────────────────────────────────────────────
+echo "==> [13/13] Building and pushing images"
 aws ecr get-login-password --region $REGION | \
   docker login --username AWS --password-stdin $REGISTRY
 

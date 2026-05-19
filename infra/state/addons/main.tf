@@ -134,3 +134,4 @@ output "karpenter_queue_name"       { value = module.karpenter.interruption_queu
 output "karpenter_instance_profile" { value = module.karpenter.instance_profile_name }
 output "irsa"                       { value = module.irsa }
 output "github_actions_role_arn"    { value = module.irsa.github_actions_role_arn }
+output "eso_role_arn"               { value = module.irsa.eso_role_arn }

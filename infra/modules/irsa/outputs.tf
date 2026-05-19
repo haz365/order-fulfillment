@@ -7,3 +7,4 @@ output "worker_role_arn"               { value = aws_iam_role.worker.arn }
 output "notification_service_role_arn" { value = aws_iam_role.notification_service.arn }
 output "scheduler_role_arn"            { value = aws_iam_role.scheduler.arn }
 output "github_actions_role_arn"       { value = aws_iam_role.github_actions.arn }
+output "eso_role_arn"                  { value = aws_iam_role.eso.arn }

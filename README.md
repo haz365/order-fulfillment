@@ -222,13 +222,32 @@ Controls that should have prevented each link:
 
 ### S8. Add column to orders without downtime
 order-service writes, dashboard-api reads.
-ALTER TABLE orders ADD COLUMN shipped_at TIMESTAMPTZ; -- nullable, no lock
-Deploy order-service v2 — writes shipped_at when status=shipped
-Deploy dashboard-api v2 — reads shipped_at
-Old pods ignore new column, new pods write/read it
-After full rollout: add index if needed (CREATE INDEX CONCURRENTLY)
 
-Never use `NOT NULL` without default in one migration — locks table. Split into: add nullable → backfill → add constraint.
+**Full sequence:**
+
+Step 1 — Add nullable column, no lock, backward compatible:
+```sql
+ALTER TABLE orders ADD COLUMN shipped_at TIMESTAMPTZ;
+```
+Deploy this as a migration Job before any service update. Old order-service ignores it. Old dashboard-api ignores it.
+
+Step 2 — Deploy order-service v2 that writes `shipped_at` when status changes to shipped. Old dashboard-api still works — it never reads `shipped_at` yet.
+
+Step 3 — Deploy dashboard-api v2 that reads `shipped_at`. All pods now on new schema.
+
+Step 4 — Optionally backfill existing rows:
+```sql
+UPDATE orders SET shipped_at = updated_at WHERE status = 'shipped';
+```
+
+Step 5 — Add index concurrently (no table lock):
+```sql
+CREATE INDEX CONCURRENTLY idx_orders_shipped_at ON orders(shipped_at);
+```
+
+**Why not add NOT NULL in one step?** ALTER TABLE with NOT NULL and no default takes an ACCESS EXCLUSIVE lock on the entire table for the duration of the update. On a large orders table this blocks all reads and writes — guaranteed downtime. Always split into: add nullable → deploy writers → backfill → add constraint.
+
+**Rollback:** Scale order-service v2 to 0, scale v1 back up. Drop column only after confirming rollback complete and no v2 pods running.
 
 ---
 

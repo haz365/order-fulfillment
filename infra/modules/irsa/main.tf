@@ -444,3 +444,45 @@ resource "aws_iam_role_policy" "github_actions" {
     ]
   })
 }
+
+resource "aws_iam_role" "eso" {
+  name = "${var.cluster_name}-eso"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Federated = var.oidc_provider_arn }
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "${local.oidc}:aud" = "sts.amazonaws.com"
+          "${local.oidc}:sub" = "system:serviceaccount:external-secrets:external-secrets"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_policy" "eso" {
+  name = "${var.cluster_name}-eso"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:ListSecretVersionIds",
+      ]
+      Resource = [
+        "arn:aws:secretsmanager:eu-west-2:989346120260:secret:/order-fulfillment/*"
+      ]
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "eso" {
+  role       = aws_iam_role.eso.name
+  policy_arn = aws_iam_policy.eso.arn
+}
