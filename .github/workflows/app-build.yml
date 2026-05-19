@@ -20,10 +20,10 @@ permissions:
   contents: write
 
 env:
-  AWS_REGION:  eu-west-2
-  ACCOUNT:     989346120260
-  REGISTRY:    989346120260.dkr.ecr.eu-west-2.amazonaws.com
-  PROJECT:     order-fulfillment
+  AWS_REGION: eu-west-2
+  ACCOUNT:    989346120260
+  REGISTRY:   989346120260.dkr.ecr.eu-west-2.amazonaws.com
+  PROJECT:    order-fulfillment
 
 jobs:
   detect-changes:
@@ -48,7 +48,6 @@ jobs:
             fi
           done
           if [ ${#SERVICES[@]} -eq 0 ]; then
-            # On workflow_dispatch build all
             SERVICES=(api-gateway order-service inventory-service payment-service \
                       notification-service shipping-service worker scheduler dashboard-api)
           fi
@@ -113,7 +112,7 @@ jobs:
         run: |
           docker push $REGISTRY/$PROJECT/${{ matrix.service }}:${{ steps.tag.outputs.sha }}
 
-      - name: Sign image
+      - name: Sign image with cosign
         run: |
           cosign sign --yes \
             $REGISTRY/$PROJECT/${{ matrix.service }}:${{ steps.tag.outputs.sha }}
@@ -141,7 +140,8 @@ jobs:
       - name: Update values-dev.yaml
         run: |
           SHA=${{ steps.tag.outputs.sha }}
-          sed -i "s/imageTag:.*/imageTag: ${SHA}/" k8s/charts/order-fulfillment/values-dev.yaml
+          sed -i "s/imageTag:.*/imageTag: ${SHA}/" \
+            k8s/charts/order-fulfillment/values-dev.yaml
 
       - name: Commit updated values
         run: |
