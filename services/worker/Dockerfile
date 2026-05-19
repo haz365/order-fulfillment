@@ -1,4 +1,4 @@
-FROM golang:1.22-bookworm AS builder
+FROM golang:1.22-bookworm@sha256:3d699e4d15d0f8f13c9195c0632a16702b8cbdece2955af1c23b37ae5d55a253 AS builder
 WORKDIR /build
 ENV GOFLAGS=-mod=mod GOPROXY=direct
 COPY services/worker/go.mod go.mod
