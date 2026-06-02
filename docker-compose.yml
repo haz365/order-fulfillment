@@ -79,7 +79,7 @@ services:
     networks: [internal]
     ports: ["8000:8000"]
     environment:
-      API_KEY:                  dev-api-key
+      API_KEY: ${API_KEY}
       ORDER_SERVICE_URL:        http://order-service:8001
       INVENTORY_SERVICE_URL:    http://inventory-service:8002
       PAYMENT_SERVICE_URL:      http://payment-service:8003
@@ -106,7 +106,7 @@ services:
       DB_PORT:               "5432"
       DB_NAME:               fulfillment
       DB_USER:               appuser
-      DB_PASSWORD:           devpassword
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_SSL_MODE:           disable
       SQS_QUEUE_URL:         http://sqs.eu-west-2.localhost.localstack.cloud:4566/000000000000/orders
       AWS_ACCESS_KEY_ID:     test
@@ -129,7 +129,7 @@ services:
       DB_PORT:     "5432"
       DB_NAME:     fulfillment
       DB_USER:     appuser
-      DB_PASSWORD: devpassword
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_SSL_MODE: disable
       PORT:        "8002"
 
@@ -148,7 +148,7 @@ services:
       DB_PORT:               "5432"
       DB_NAME:               fulfillment
       DB_USER:               appuser
-      DB_PASSWORD:           devpassword
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_SSL_MODE:           disable
       SQS_QUEUE_URL:         http://sqs.eu-west-2.localhost.localstack.cloud:4566/000000000000/orders
       AWS_ACCESS_KEY_ID:     test
@@ -173,7 +173,7 @@ services:
       DB_PORT:               "5432"
       DB_NAME:               fulfillment
       DB_USER:               appuser
-      DB_PASSWORD:           devpassword
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_SSL_MODE:           disable
       PORT:                  "8004"
       SQS_QUEUE_URL:         http://sqs.eu-west-2.localhost.localstack.cloud:4566/000000000000/orders
@@ -197,7 +197,7 @@ services:
       DB_PORT:               "5432"
       DB_NAME:               fulfillment
       DB_USER:               appuser
-      DB_PASSWORD:           devpassword
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_SSL_MODE:           disable
       SQS_QUEUE_URL:         http://sqs.eu-west-2.localhost.localstack.cloud:4566/000000000000/orders
       AWS_ACCESS_KEY_ID:     test
@@ -222,7 +222,7 @@ services:
       DB_PORT:               "5432"
       DB_NAME:               fulfillment
       DB_USER:               appuser
-      DB_PASSWORD:           devpassword
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_SSL_MODE:           disable
       PORT:                  "8006"
       SQS_QUEUE_URL:         http://sqs.eu-west-2.localhost.localstack.cloud:4566/000000000000/orders
@@ -248,7 +248,7 @@ services:
       DB_PORT:               "5432"
       DB_NAME:               fulfillment
       DB_USER:               appuser
-      DB_PASSWORD:           devpassword
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_SSL_MODE:           disable
       PORT:                  "8007"
       SQS_QUEUE_URL:         http://sqs.eu-west-2.localhost.localstack.cloud:4566/000000000000/orders
@@ -272,7 +272,7 @@ services:
       DB_PORT:     "5432"
       DB_NAME:     fulfillment
       DB_USER:     appuser
-      DB_PASSWORD: devpassword
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_SSL_MODE: disable
 
   dashboard-ui:
