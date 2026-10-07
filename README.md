@@ -33,26 +33,9 @@ The infrastructure is managed entirely as code across four independently deploya
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    User -->|HTTPS| R53[Route53]
-    R53 --> NLB[AWS NLB]
-    NLB --> NGINX[NGINX Ingress · TLS]
-    NGINX --> GW[api-gateway :8000]
-    GW --> OS[order-service :8001]
-    GW --> IS[inventory-service :8002]
-    GW --> PS[payment-service :8003]
-    GW --> SS[shipping-service :8005]
-    GW --> DA[dashboard-api :8009]
-    OS & PS & SS -->|publish| SQS[AWS SQS]
-    SQS -->|consume| WK[worker :8006]
-    SQS -->|consume| NS[notification-service :8004]
-    SC[scheduler :8007] -->|schedule| SQS
-    OS & IS & PS & SS & NS & WK & DA --> PG[(PostgreSQL · StatefulSet)]
-    GW --> RD[(Redis · StatefulSet)]
-```
+![Architecture diagram](docs/eks-architecture.svg)
 
----
+
 
 ## Infrastructure
 
